@@ -44,6 +44,7 @@ typedef uint8_t bool;
 #define DATA_STACK_SIZE 128
 #define BYTECODE_SIZE 1024
 #define VARSPACE_SIZE 64
+#define STRINGSPACE_SIZE 16
 #define MAX_WORDS 256 // including primitives, variables and constants
 #define MAX_PRIMITIVES 64
 #define RETURN_STACK_SIZE 64

@@ -52,6 +52,7 @@ stos_size_t stos_prim_count = 0;
 enum stos_opcode
 {
     OPCODE_PUSH_CELL,
+    OPCODE_PUSH_STRING,
     OPCODE_CALL_ID,
     OPCODE_JMP,
     OPCODE_JZ,
@@ -184,6 +185,9 @@ stos_cpop (stos_size_t *n)
 
 uint8_t stos_varspace[VARSPACE_SIZE];
 stos_size_t stos_vsp = 0;
+
+char stos_string[STRINGSPACE_SIZE];
+stos_size_t stos_strp = 0;
 
 void
 stos_input_clear (void)
@@ -629,6 +633,26 @@ stos_word_exec (stos_size_t id)
                 for (stos_size_t i = 0; i < len; i++)
                     stos_putc (stos_bytecode[_pc++]);
                 break;
+            }
+            case OPCODE_PUSH_STRING: {
+                stos_size_t len = stos_bc_read_size (&_pc);
+
+                stos_cell_t addr = (stos_cell_t)&stos_bytecode[_pc];
+                // stos_push (addr);
+
+                _pc += len;
+
+                // stos_push ((stos_cell_t)len);
+
+                stos_memcpy (stos_string + stos_strp, (char *)addr, len);
+                stos_string[stos_strp + len] = '\0';
+
+                if (!stos_push ((stos_cell_t)stos_string + stos_strp))
+                    return false;
+
+                stos_strp += len + 1;
+
+                return stos_push ((stos_cell_t)len);
             }
             }
         }
@@ -1305,11 +1329,140 @@ prim_constant (void)
 }
 
 bool
+prim_create (void)
+{
+    if (stos_mode != MODE_INTERPRET)
+    {
+        stos_seterrstr ("`CREATE` IN DEFINITION");
+        return false;
+    }
+
+    if (!stos_token_next () || current_token.type != TOKEN_WORD)
+        return false;
+
+    stos_cell_t addr = (stos_cell_t)&stos_varspace[stos_vsp];
+
+    stos_ssize_t id = stos_word_create (current_token.str, 0);
+    if (id < 0)
+        return false;
+
+    stos_bc_emit_op (OPCODE_PUSH_CELL);
+    stos_bc_emit_addr (addr);
+    stos_bc_emit_op (OPCODE_RET);
+    stos_word_finish (id);
+
+    return true;
+}
+
+bool
+prim_allot (void)
+{
+    if (stos_mode != MODE_INTERPRET)
+    {
+        stos_seterrstr ("`ALLOT` IN DEFINITION");
+        return false;
+    }
+
+    stos_cell_t n;
+    if (!stos_pop (&n))
+        return false;
+
+    if (stos_vsp + n > VARSPACE_SIZE)
+    {
+        stos_seterrstr ("VARIABLE SPACE AT CAPACITY");
+        return false;
+    }
+
+    stos_vsp += n;
+    return true;
+}
+
+bool
+prim_squote (void)
+{
+    if (stos_input_cursor == NULL)
+        stos_input_cursor = stos_input;
+
+    while (stos_isspace (*stos_input_cursor))
+        stos_input_cursor++;
+
+    char *str_start = stos_input_cursor;
+    stos_size_t len = 0;
+
+    while (*stos_input_cursor != '"' && *stos_input_cursor != '\0')
+    {
+        len++;
+        stos_input_cursor++;
+    }
+
+    if (*stos_input_cursor != '"')
+    {
+        stos_seterrstr ("UNTERMINATED STRING");
+        return false;
+    }
+
+    stos_input_cursor++;
+
+    if (stos_mode == MODE_INTERPRET)
+    {
+        if (stos_strp + len + 1 >= STRINGSPACE_SIZE)
+        {
+            stos_seterrstr ("STRING TOO LONG");
+            return false;
+        }
+
+        stos_memcpy (stos_string + stos_strp, str_start, len);
+        stos_string[stos_strp + len] = '\0';
+
+        if (!stos_push ((stos_cell_t)stos_string + stos_strp))
+            return false;
+
+        stos_strp += len + 1;
+
+        return stos_push ((stos_cell_t)len);
+    }
+    else if (stos_mode == MODE_COMPILE_TOKS)
+    {
+        stos_bc_emit_op (OPCODE_PUSH_STRING);
+        stos_bc_emit_size (len);
+
+        for (stos_size_t i = 0; i < len; i++)
+        {
+            stos_bytecode[stos_pc++] = str_start[i];
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+bool
+prim_type (void)
+{
+    stos_cell_t len, addr;
+    if (!stos_pop (&len) || !stos_pop (&addr))
+        return false;
+
+    char *str = (char *)addr;
+    for (stos_size_t i = 0; i < len; i++)
+        stos_putc (str[i]);
+
+    if (stos_strp >= len + 1)
+        stos_strp -= (len + 1);
+    else
+        stos_strp = 0;
+
+    return true;
+}
+
+bool
 stos_register_primitives (void)
 {
     bool r = !stos_primitive_compile (".", prim_dot, 0) ||                        //
              !stos_primitive_compile (".s", prim_putstack, 0) ||                  //
              !stos_primitive_compile (".\"", prim_putstr, STOS_IMMEDIATE) ||      //
+             !stos_primitive_compile ("type", prim_type, STOS_IMMEDIATE) ||       //
              !stos_primitive_compile ("cr", prim_cr, 0) ||                        //
              !stos_primitive_compile ("emit", prim_emit, 0) ||                    //
              !stos_primitive_compile ("key", prim_key, 0) ||                      //
@@ -1345,6 +1498,9 @@ stos_register_primitives (void)
              !stos_primitive_compile ("exit", prim_exit, STOS_IMMEDIATE) ||       //
              !stos_primitive_compile ("variable", prim_var, 0) ||                 //
              !stos_primitive_compile ("constant", prim_constant, 0) ||            //
+             !stos_primitive_compile ("create", prim_create, 0) ||                //
+             !stos_primitive_compile ("allot", prim_allot, 0) ||                  //
+             !stos_primitive_compile ("s\"", prim_squote, STOS_IMMEDIATE) ||      //
              !stos_primitive_compile (">r", prim_tor, 0) ||                       //
              !stos_primitive_compile ("r>", prim_fromr, 0) ||                     //
              !stos_primitive_compile ("r@", prim_rfetch, 0) ||                    //

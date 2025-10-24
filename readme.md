@@ -32,6 +32,22 @@ See `stos_register_primitives` function in `stos.c` :)
 
 All primitives should work as described in **ANS FORTH**.
 
+WARNING: `s"` works using a single static buffer, with a very primitive bump-allocator. This means, that you can define multiple strings, and do some
+cursed things with them, and be just fine in most cases, but it can break very easily if you do to much. Ex:
+```
+STOS>> s" very long"
+STOS>> s" xD"
+STOS>> >r rot rot r> rot rot
+STOS>> type cr
+very long
+STOS>> s" another"
+STOS>> >r rot rot r> rot rot
+STOS>> type cr
+^@D                <-- CORRUPTED
+STOS>> type cr
+another
+```
+
 # License
 
 STOS is licensed under [GPL3](https://www.gnu.org/licenses/gpl-3.0.txt) - see [LICENSE](LICENSE).
