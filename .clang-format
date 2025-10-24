@@ -1,0 +1,18 @@
+# Pseudo-GNU style formatting
+
+BasedOnStyle: GNU
+IndentWidth: 4
+BreakBeforeBraces: Custom
+
+ColumnLimit: 120
+
+BraceWrapping:
+  AfterFunction: true
+  AfterStruct: true
+  AfterEnum: true
+  AfterClass: true
+  AfterUnion: true
+  AfterNamespace: true
+  AfterControlStatement: true
+  BeforeElse: true
+  SplitEmptyFunction: false
