@@ -17,7 +17,7 @@ void stos_preinit (void);   // runs once, before any IO (use this for any platfo
 char stos_getc (void);      // get character from user, blocking
 void stos_putc (char c);    // display character to the user
 ```
-- At least 12kB of FLASH (it compiles to 10370 bytes with mp-lab xc8 for avr16dd14, including the platform-dependent code);
+- At least 16kB of FLASH (it compiles to 12336 bytes with mp-lab xc8 for avr16dd14, including the platform-dependent code);
 - At least 2kb of RAM (You can push it down more, but You'll have to sacrifice some features);
 
 ## Compilation and flashing

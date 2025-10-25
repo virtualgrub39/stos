@@ -222,13 +222,13 @@ stos_memcpy (void *dest, const void *src, stos_size_t n)
     return dest;
 }
 
-void *
+void
 stos_memmove (void *dest, const void *src, stos_size_t n)
 {
     unsigned char *d = (unsigned char *)dest;
     const unsigned char *s = (const unsigned char *)src;
     if (d == s || n == 0)
-        return dest;
+        return;
     if (d < s)
     {
         while (n--)
@@ -241,7 +241,17 @@ stos_memmove (void *dest, const void *src, stos_size_t n)
         while (n--)
             *--d = *--s;
     }
-    return dest;
+}
+
+void
+stos_memset (void *dest, uint8_t b, stos_size_t n)
+{
+    uint8_t *d = (uint8_t *)dest;
+    if (n == 0)
+        return;
+    while (n--)
+        *d++ = b;
+    return;
 }
 
 stos_size_t
@@ -599,11 +609,12 @@ stos_word_exec (stos_size_t id)
                 break;
             }
             case OPCODE_DO: {
-                stos_cell_t limit;
-                if (!stos_pop (&limit))
-                    return false;
+
                 stos_cell_t start;
                 if (!stos_pop (&start))
+                    return false;
+                stos_cell_t limit;
+                if (!stos_pop (&limit))
                     return false;
 
                 stos_rpush ((stos_size_t)limit);
@@ -1088,6 +1099,46 @@ prim_store (void)
 }
 
 bool
+prim_move (void)
+{
+    stos_cell_t dest, src, u;
+    if (!stos_pop (&u))
+        return false;
+    if (!stos_pop (&dest))
+        return false;
+    if (!stos_pop (&src))
+        return false;
+
+    stos_memmove ((void *)dest, (void *)src, u);
+    return true;
+}
+
+bool
+prim_fill (void)
+{
+    stos_cell_t addr, u, byte;
+    if (!stos_pop (&byte))
+        return false;
+    if (!stos_pop (&u))
+        return false;
+    if (!stos_pop (&addr))
+        return false;
+
+    stos_memset ((void *)addr, (uint8_t)byte, u);
+    return true;
+}
+
+bool
+prim_cells (void)
+{
+    stos_cell_t n;
+    if (!stos_pop (&n))
+        return false;
+
+    return stos_push (n * sizeof (stos_cell_t));
+}
+
+bool
 prim_cfetch (void)
 {
     stos_cell_t addr;
@@ -1457,6 +1508,29 @@ prim_type (void)
 }
 
 bool
+prim_cellp (void)
+{
+    stos_cell_t addr;
+    if (!stos_pop (&addr))
+        return false;
+
+    return stos_push (addr + sizeof (stos_cell_t));
+}
+
+bool
+prim_i (void)
+{
+    if (stos_rsp < 2)
+    {
+        stos_seterrstr ("`I` OUTSIDE OF DO LOOP");
+        return false;
+    }
+
+    stos_size_t index = stos_rstack[stos_rsp - 1];
+    return stos_push ((stos_number_t)index);
+}
+
+bool
 stos_register_primitives (void)
 {
     bool r = !stos_primitive_compile (".", prim_dot, 0) ||                        //
@@ -1487,6 +1561,7 @@ stos_register_primitives (void)
              !stos_primitive_compile ("else", prim_else, STOS_IMMEDIATE) ||       //
              !stos_primitive_compile ("then", prim_endif, STOS_IMMEDIATE) ||      //
              !stos_primitive_compile ("do", prim_do, STOS_IMMEDIATE) ||           //
+             !stos_primitive_compile ("i", prim_i, 0) ||                          //
              !stos_primitive_compile ("begin", prim_begin, STOS_IMMEDIATE) ||     //
              !stos_primitive_compile ("until", prim_until, STOS_IMMEDIATE) ||     //
              !stos_primitive_compile ("while", prim_while, STOS_IMMEDIATE) ||     //
@@ -1500,6 +1575,10 @@ stos_register_primitives (void)
              !stos_primitive_compile ("constant", prim_constant, 0) ||            //
              !stos_primitive_compile ("create", prim_create, 0) ||                //
              !stos_primitive_compile ("allot", prim_allot, 0) ||                  //
+             !stos_primitive_compile ("cells", prim_cells, 0) ||                  //
+             !stos_primitive_compile ("move", prim_move, 0) ||                    //
+             !stos_primitive_compile ("fill", prim_fill, 0) ||                    //
+             !stos_primitive_compile ("cell+", prim_cellp, 0) ||                  //
              !stos_primitive_compile ("s\"", prim_squote, STOS_IMMEDIATE) ||      //
              !stos_primitive_compile (">r", prim_tor, 0) ||                       //
              !stos_primitive_compile ("r>", prim_fromr, 0) ||                     //
@@ -1631,11 +1710,14 @@ main (void)
 #endif
 
         while (true)
-            ;
+        {
+        }
     }
 
 #ifdef _STOS_INTERACTIVE
-    stos_puts ("STOS, Copyright (C) 2025 virtualgrub39");
+    stos_write ("STOS ");
+    stos_write (STOS_VERSION);
+    stos_puts (", Copyright (C) 2025 virtualgrub39");
     stos_puts ("READY");
 #endif
 

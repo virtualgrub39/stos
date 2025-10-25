@@ -18,12 +18,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #ifndef STOS_H
 #define STOS_H
 
+#ifndef _STOS_VERSION
+#define STOS_VERSION "v1.0"
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 
 typedef uint32_t stos_size_t;
-typedef int16_t stos_ssize_t;
-typedef int16_t stos_number_t;
+typedef int32_t stos_ssize_t;
+typedef int32_t stos_number_t;
 typedef uintptr_t stos_cell_t;
 #define SIZEOF_OPCODE 1
 
@@ -43,7 +47,7 @@ typedef uint8_t bool;
 #define INPUT_ACCUMULATOR_LEN 128
 #define DATA_STACK_SIZE 128
 #define BYTECODE_SIZE 1024
-#define VARSPACE_SIZE 64
+#define VARSPACE_SIZE 256
 #define STRINGSPACE_SIZE 16
 #define MAX_WORDS 256 // including primitives, variables and constants
 #define MAX_PRIMITIVES 64
@@ -59,6 +63,7 @@ _Static_assert (MAX_PRIMITIVES <= MAX_WORDS, "primitives can't fit into words");
 
 typedef bool (*stos_primitive_fn) (void);
 
+// hardware interface
 void stos_preinit (void);
 char stos_getc (void);
 void stos_putc (char c);
